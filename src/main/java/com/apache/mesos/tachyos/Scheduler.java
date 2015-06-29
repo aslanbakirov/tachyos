@@ -28,16 +28,25 @@ import org.apache.mesos.Protos.Value;
 import org.apache.mesos.SchedulerDriver;
 
 import com.apache.mesos.tachyos.config.SchedulerConf;
+import com.apache.mesos.tachyos.util.TachyonConstants;
 import com.google.protobuf.ByteString;
 
+/**
+ * This is Scheduler class of Tachyos Framework
+ * @author Aslan Bakirov
+ *
+ */
 public class Scheduler implements org.apache.mesos.Scheduler, Runnable {
 
   public static final Log log = LogFactory.getLog(Scheduler.class);
   private static final SchedulerConf conf =SchedulerConf.getInstance();
   private Set<String> workers = new HashSet<>();
+  private boolean masterStarted=false;
   int tasksCreated=0;
   
-
+/**
+ * This method creates FrameworkInfo to pass as a parameter to MesosSchedulerDriver
+ */
 public void run() {
 	  FrameworkInfo.Builder frameworkInfo = FrameworkInfo.newBuilder()
 		        .setName(conf.getFrameworkName())
@@ -51,16 +60,25 @@ public void run() {
 		    driver.run();
 		  }
 
-  @Override
+/**
+ * This method logs message when scheduler driver is disconnected
+ */
+@Override
   public void disconnected(SchedulerDriver driver) {
     log.info("Scheduler driver disconnected");
   }
 
+/**
+ * This method logs error message when error occurs in scheduler driver
+ */
   @Override
   public void error(SchedulerDriver driver, String message) {
     log.error("Scheduler driver error: " + message);
   }
 
+  /**
+   * This method logs executor ID, slave ID and status when executor lost
+   */
   @Override
   public void executorLost(SchedulerDriver driver, ExecutorID executorID, SlaveID slaveID,
       int status) {
@@ -68,6 +86,9 @@ public void run() {
         + slaveID.getValue() + " status=" + status);
   }
 
+  /**
+   * This method logs executor ID, slave ID and scheduler data.
+   */
   @Override
   public void frameworkMessage(SchedulerDriver driver, ExecutorID executorID, SlaveID slaveID,
       byte[] data) {
@@ -75,16 +96,25 @@ public void run() {
         + slaveID.getValue() + " data='" + Arrays.toString(data) + "'");
   }
 
+  /**
+   * This method logs offer id when offer is rescinded.
+   */
   @Override
   public void offerRescinded(SchedulerDriver driver, OfferID offerId) {
     log.info("Offer rescinded: offerId=" + offerId.getValue());
   }
 
+  /**
+   * This method logs framework Id when framework is registered
+   */
   @Override
   public void registered(SchedulerDriver driver, FrameworkID frameworkId, MasterInfo masterInfo) {
     log.info("Registered framework frameworkId=" + frameworkId.getValue());
   }
 
+  /**
+   * This method logs reregistration info when framework is reregistered
+   */
   @Override
   public void reregistered(SchedulerDriver driver, MasterInfo masterInfo) {
     log.info("Reregistered framework: starting task reconciliation");
@@ -95,6 +125,9 @@ public void run() {
 
   }
 
+  /**
+   * This method creates and starts Tachyon master node if not stated yet. In addition, creates worker nodes if master is alive.
+   */
 public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
    
 	 
@@ -102,12 +135,34 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 		 
 		 List<TaskInfo> tasks = new ArrayList<>();
 	     log.info("Got resource offer from hostname:"+offer.getHostname());
-	      
 	     
-	     //TODO (aslan) make better way to understand master started
-	      if(!workers.contains(offer.getHostname()) && !available(Integer.parseInt(conf.getTachyonMasterPort()))) {  
+	     if(!masterStarted){
+	    	 log.info("Starting Tachyon master on "+offer.getHostname());
+		        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.MASTER_NODE_ID+":"+tasksCreated).build();
+		        TaskInfo task = TaskInfo
+		                .newBuilder()
+		                .setName("task " + taskId.getValue())
+		                .setTaskId(taskId)
+		                .setSlaveId(offer.getSlaveId())
+		                .addResources(
+		                    Resource.newBuilder().setName("cpus").setType(Value.Type.SCALAR)
+		                        .setScalar(Value.Scalar.newBuilder().setValue(Double.parseDouble(conf.getMasterExecutorCpus()))))
+		                .addResources(
+		                    Resource.newBuilder().setName("mem").setType(Value.Type.SCALAR)
+		                        .setScalar(Value.Scalar.newBuilder().setValue(Double.parseDouble(conf.getMasterExecutorMem()))))
+		                .setExecutor(getTachyonMasterExecutor())
+		                .setData(ByteString.copyFromUtf8("tachyon-mesos/bin/tachyos-masternode"))
+		                .build();
+
+		        tasks.add(task);
+		        tasksCreated = tasksCreated + 1;
+		        driver.launchTasks(Arrays.asList(offer.getId()), tasks);
+		        masterStarted=true;
+	     }
+	     
+	     if(!workers.contains(offer.getHostname()) && masterStarted){  
 	        log.info("Starting Tachyon worker on "+offer.getHostname());
-	        TaskID taskId = TaskID.newBuilder().setValue(Integer.toString(tasksCreated++)).build();
+	        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.WORKER_NODE_ID+":"+tasksCreated).build();
 	        TaskInfo task = TaskInfo
 	                .newBuilder()
 	                .setName("task " + taskId.getValue())
@@ -119,7 +174,8 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 	                .addResources(
 	                    Resource.newBuilder().setName("mem").setType(Value.Type.SCALAR)
 	                        .setScalar(Value.Scalar.newBuilder().setValue(Double.parseDouble(conf.getWorkerExecutorMem()))))
-	                .setExecutor(getTachyonWorkerExecutor()).build();
+	                .setExecutor(getTachyonWorkerExecutor()).setData(ByteString.copyFromUtf8("tachyon-mesos/bin/tachyos-workernode"))
+	                .build();
 
 	        tasks.add(task);
 	        tasksCreated = tasksCreated + 1;
@@ -127,6 +183,7 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 	        driver.launchTasks(Arrays.asList(offer.getId()), tasks);
 	      }
 	      else {
+	    	log.info("Declining offer from "+offer.getHostname()); 
 	        driver.declineOffer(offer.getId());
 	      }
 	    }
@@ -134,14 +191,20 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 }
 
 
-
+/**
+ * This method logs slave id when slave get lost.
+ */
 public void slaveLost(SchedulerDriver driver, SlaveID slaveID) {
 	log.info("SLAVE LOST:" + slaveID.getValue()); 
 	
 }
 
 
-
+/**
+ * This method check whether a port is available or not
+ * @param port port to be checked
+ * @return true if port is available, false if port already in use.
+ */
 private static boolean available(int port) {
     try (ServerSocket ignored = new ServerSocket(port)) {
         return true;
@@ -149,12 +212,18 @@ private static boolean available(int port) {
         return false;
     }
 }
+/**
+ * This method creates ExecutorInfo for tachyos framework
+ * @return Returns ExecutorInfo for tachyos framework
+ */
+
 private static ExecutorInfo getTachyonWorkerExecutor(){
 
-	String path = System.getProperty("user.dir") + "/tachyos-0.1.0-uber.jar";
-    CommandInfo.URI uri = CommandInfo.URI.newBuilder().setValue(path).setExtract(false).build();
+	//String path = System.getProperty("user.dir") + "/tachyos-0.0.1-uber.jar";
+	String path = "/home/mesosadm/Development/tachyon-mesos.tgz";
+    CommandInfo.URI uri = CommandInfo.URI.newBuilder().setValue(path).setExtract(true).build();
     
-	String commandTachyonWorkerExecutor = "java -cp tachyos-0.1.0-uber.jar com.apache.mesos.tachyos.executors.TachyonWorkerExecutor"; 
+	String commandTachyonWorkerExecutor = "java -cp tachyon-mesos/tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonWorkerExecutor"; 
 	
 	log.info("commandTachyonWorkerExecutor:" + commandTachyonWorkerExecutor);
 	
@@ -162,8 +231,28 @@ private static ExecutorInfo getTachyonWorkerExecutor(){
 	
    ExecutorInfo executor= ExecutorInfo.newBuilder()
    .setExecutorId(ExecutorID.newBuilder().setValue("TachyonWorkerExecutor"))
-   .setCommand(commandInfoTachyon).setData(ByteString.copyFromUtf8(System.getProperty("user.dir")))
+   .setCommand(commandInfoTachyon)
    .setName("Tachyon Worker Executor (Java)").setSource("java").build();
+
+return executor;
+}
+
+private static ExecutorInfo getTachyonMasterExecutor(){
+
+	//String path = System.getProperty("user.dir") + "/tachyos-0.0.1-uber.jar";
+	String path = "/home/mesosadm/Development/tachyon-mesos.tgz";
+    CommandInfo.URI uri = CommandInfo.URI.newBuilder().setValue(path).setExtract(true).build();
+    
+	String commandTachyonMasterExecutor = "java -cp tachyon-mesos/tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonMasterExecutor"; 
+	
+	log.info("commandTachyonMasterExecutor:" + commandTachyonMasterExecutor);
+	
+    CommandInfo commandInfoTachyon = CommandInfo.newBuilder().setValue(commandTachyonMasterExecutor).addUris(uri).build();	
+	
+   ExecutorInfo executor= ExecutorInfo.newBuilder()
+   .setExecutorId(ExecutorID.newBuilder().setValue("TachyonMasterExecutor"))
+   .setCommand(commandInfoTachyon)
+   .setName("Tachyon Master Executor (Java)").setSource("java").build();
 
 return executor;
 }

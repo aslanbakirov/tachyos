@@ -9,6 +9,10 @@ public class SchedulerConf {
   private static SchedulerConf instance = null;
   private static Properties props = null;
 
+  public SchedulerConf() {
+    props = System.getProperties();
+  }
+
   public static SchedulerConf getInstance() {
     if (instance == null) {
       instance = new SchedulerConf();
@@ -89,6 +93,14 @@ public class SchedulerConf {
     return getConf().getProperty("mesos.tachyon.worker.mem", "1024");
   }
 
+  public String getMasterExecutorCpus() {
+    return getConf().getProperty("mesos.tachyon.master.executor.cpus", "1.0");
+  }
+
+  public String getMasterExecutorMem() {
+    return getConf().getProperty("mesos.tachyon.master.mem", "1024");
+  }
+
   public String getTachyonHome() {
     return getConf().getProperty("tachyon.home", "/home/mesosadm/tachyon-0.6.4");
   }
@@ -103,7 +115,7 @@ public class SchedulerConf {
 
   // TODO will be changed in Mesos //for now it is mesosadm
   public String getTachyonUser() {
-    return getConf().getProperty("mesos.tachyon.user", "mesosadm");
+    return getConf().getProperty("mesos.tachyon.user", "root");
   }
 
   // TODO This role needs to be updated.
@@ -113,7 +125,7 @@ public class SchedulerConf {
 
   // TODO will be changed, do it better with ZK or DNS stuff...
   public String getMesosMasterUri() {
-    return getConf().getProperty("mesos.master.uri", "10.100.8.91:5050");
+    return getConf().getProperty("mesos.master.uri", "localhost:5050");
   }
 
   public String getDataDir() {
@@ -146,13 +158,6 @@ public class SchedulerConf {
 
   public String getDeadNodeTimeout() {
     return getConf().getProperty("mesos.tachyon.deadnode.timeout.seconds", "90");
-  }
-
-  public SchedulerConf() {
-    props = System.getProperties();
-    props.put("tachyon.home", "/home/mesosadm/tachyon-0.6.4");
-    // props.put("java.library.path", "/usr/lib:/usr/local/lib:lib/native");
-
   }
 
   public static Properties getConf() {
