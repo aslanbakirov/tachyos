@@ -2,8 +2,6 @@
 
 DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 
-TACHYON_HOME="/home/mesosadm/tachyon-0.6.4"
-
 if [ -z "$JAVA_HOME" ]; then
   JAVA_HOME_DIR=$(dirname $(readlink -f $(which java)))
   if [ -f $JAVA_HOME_DIR/../../bin/java ]; then
@@ -19,9 +17,7 @@ fi
 trap "{ $DIR/tachyos-killtree "$$" ; exit 0; }" EXIT
 
 function run_workernode() {
-  while [ true ] ; do
    $TACHYON_HOME/bin/tachyon-start.sh worker Mount
-  done
 }
 
 run_workernode
