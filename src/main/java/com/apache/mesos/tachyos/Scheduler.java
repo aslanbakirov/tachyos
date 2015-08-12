@@ -365,15 +365,14 @@ public class Scheduler implements org.apache.mesos.Scheduler, Runnable {
                 .setType(Value.Type.SCALAR)
                 .setScalar(Value.Scalar.newBuilder()
                     .setValue(0.5).build())
-                    .setRole(conf.getTachyonRole())
+                .setRole(conf.getTachyonRole())
                 .build(),
             Resource.newBuilder()
                 .setName("mem")
                 .setType(Value.Type.SCALAR)
                 .setScalar(Value.Scalar.newBuilder()
                     .setValue(512).build())
-                    .setRole(conf.getTachyonRole())
+                .setRole(conf.getTachyonRole())
                 .build());
     }
-
 }
