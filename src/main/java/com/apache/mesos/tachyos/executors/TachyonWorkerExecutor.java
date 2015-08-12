@@ -15,67 +15,66 @@ import com.apache.mesos.tachyos.config.SchedulerConf;
 
 public class TachyonWorkerExecutor extends AbstractNodeExecutor {
 
-  public static final Log log = LogFactory.getLog(TachyonWorkerExecutor.class);
-  private Task workerNodeTask;
-  private ExecutorInfo executorInfo;
+    public static final Log log = LogFactory.getLog(TachyonWorkerExecutor.class);
+    private Task workerNodeTask;
+    private ExecutorInfo executorInfo;
 
-  TachyonWorkerExecutor(SchedulerConf schedulerConf) {
-    super(schedulerConf);
-  }
-
-  public void frameworkMessage(ExecutorDriver driver, byte[] msg) {
-    String messageStr = new String(msg);
-    log.info("Executor received framework message: " + messageStr);
-
-    driver.sendStatusUpdate(TaskStatus.newBuilder()
-        .setTaskId(workerNodeTask.taskInfo.getTaskId())
-        .setState(TaskState.TASK_RUNNING)
-        .setMessage(messageStr)
-        .build());
-  }
-
-  public void killTask(ExecutorDriver driver, TaskID taskId) {
-
-    log.info("Killing task : " + taskId.getValue());
-
-    if (workerNodeTask != null && workerNodeTask.process != null) {
-      workerNodeTask.process.destroy();
-      workerNodeTask.process = null;
+    TachyonWorkerExecutor(SchedulerConf schedulerConf) {
+        super(schedulerConf);
     }
 
-    driver.sendStatusUpdate(TaskStatus.newBuilder()
-        .setTaskId(taskId)
-        .setState(TaskState.TASK_KILLED)
-        .build());
+    public void frameworkMessage(ExecutorDriver driver, byte[] msg) {
+        String messageStr = new String(msg);
+        log.info("Executor received framework message: " + messageStr);
 
-  }
+        driver.sendStatusUpdate(TaskStatus.newBuilder()
+            .setTaskId(workerNodeTask.taskInfo.getTaskId())
+            .setState(TaskState.TASK_RUNNING)
+            .setMessage(messageStr)
+            .build());
+    }
 
-  public void launchTask(ExecutorDriver driver, TaskInfo taskInfo) {
-    executorInfo = taskInfo.getExecutor();
-    Task task = new Task(taskInfo);
-    workerNodeTask = task;
+    public void killTask(ExecutorDriver driver, TaskID taskId) {
 
-    log.info("launching worker task");
-    // runCommand(driver, workerNodeTask, workerNodeTask.cmd);
+        log.info("Killing task : " + taskId.getValue());
 
-    startProcess(driver, workerNodeTask);
+        if (workerNodeTask != null && workerNodeTask.process != null) {
+            workerNodeTask.process.destroy();
+            workerNodeTask.process = null;
+        }
 
-    driver.sendStatusUpdate(TaskStatus.newBuilder()
-        .setTaskId(workerNodeTask.taskInfo.getTaskId())
-        .setState(TaskState.TASK_RUNNING)
-        .build());
-  }
+        driver.sendStatusUpdate(TaskStatus.newBuilder()
+            .setTaskId(taskId)
+            .setState(TaskState.TASK_KILLED)
+            .build());
 
-  public void shutdown(ExecutorDriver driver) {
-    log.info("Executor asked to shutdown");
-    killTask(driver, workerNodeTask.taskInfo.getTaskId());
+    }
 
-  }
+    public void launchTask(ExecutorDriver driver, TaskInfo taskInfo) {
+        executorInfo = taskInfo.getExecutor();
+        Task task = new Task(taskInfo);
+        workerNodeTask = task;
 
-  public static void main(String[] args) throws Exception {
-    MesosExecutorDriver driver = new MesosExecutorDriver(new TachyonWorkerExecutor(
-        SchedulerConf.getInstance()));
-    System.exit(driver.run() == Status.DRIVER_STOPPED ? 0 : 1);
-  }
+        log.info("launching worker task");
+        // runCommand(driver, workerNodeTask, workerNodeTask.cmd);
 
+        startProcess(driver, workerNodeTask);
+
+        driver.sendStatusUpdate(TaskStatus.newBuilder()
+            .setTaskId(workerNodeTask.taskInfo.getTaskId())
+            .setState(TaskState.TASK_RUNNING)
+            .build());
+    }
+
+    public void shutdown(ExecutorDriver driver) {
+        log.info("Executor asked to shutdown");
+        killTask(driver, workerNodeTask.taskInfo.getTaskId());
+    }
+
+    public static void main(String[] args) throws Exception {
+        MesosExecutorDriver driver = new MesosExecutorDriver(
+                                     new TachyonWorkerExecutor(
+                                        SchedulerConf.getInstance()));
+        System.exit(driver.run() == Status.DRIVER_STOPPED ? 0 : 1);
+    }
 }

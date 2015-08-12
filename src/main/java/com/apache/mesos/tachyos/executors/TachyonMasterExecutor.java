@@ -15,68 +15,68 @@ import com.apache.mesos.tachyos.config.SchedulerConf;
 
 public class TachyonMasterExecutor extends AbstractNodeExecutor {
 
-  public static SchedulerConf conf = SchedulerConf.getInstance();
-  public static final Log log = LogFactory.getLog(TachyonMasterExecutor.class);
-  private Task masterNodeTask;
-  private ExecutorInfo executorInfo;
+    public static SchedulerConf conf = SchedulerConf.getInstance();
+    public static final Log log = LogFactory.getLog(TachyonMasterExecutor.class);
+    private Task masterNodeTask;
+    private ExecutorInfo executorInfo;
 
-  TachyonMasterExecutor(SchedulerConf schedulerConf) {
-    super(schedulerConf);
-  }
-
-  public void frameworkMessage(ExecutorDriver driver, byte[] msg) {
-    String messageStr = new String(msg);
-    log.info("Executor received framework message: " + messageStr);
-
-    driver.sendStatusUpdate(TaskStatus.newBuilder()
-        .setTaskId(masterNodeTask.taskInfo.getTaskId())
-        .setState(TaskState.TASK_RUNNING)
-        .setMessage(messageStr)
-        .build());
-  }
-
-  public void killTask(ExecutorDriver driver, TaskID taskId) {
-    log.info("Killing task : " + taskId.getValue());
-
-    if (masterNodeTask != null && masterNodeTask.process != null) {
-      masterNodeTask.process.destroy();
-      masterNodeTask.process = null;
+    TachyonMasterExecutor(SchedulerConf schedulerConf) {
+        super(schedulerConf);
     }
-    driver.sendStatusUpdate(TaskStatus.newBuilder()
-        .setTaskId(taskId)
-        .setState(TaskState.TASK_KILLED)
-        .build());
 
-  }
+    public void frameworkMessage(ExecutorDriver driver, byte[] msg) {
+        String messageStr = new String(msg);
+        log.info("Executor received framework message: " + messageStr);
 
-  public void launchTask(ExecutorDriver driver, TaskInfo taskInfo) {
+        driver.sendStatusUpdate(TaskStatus.newBuilder()
+            .setTaskId(masterNodeTask.taskInfo.getTaskId())
+            .setState(TaskState.TASK_RUNNING)
+            .setMessage(messageStr)
+             .build());
+    }
 
-    log.info("launching master task");
-    // executorInfo = taskInfo.getExecutor();
-    Task task = new Task(taskInfo);
-    masterNodeTask = task;
-    // format case must be handled
-    // runCommand(driver, masterNodeTask, masterNodeTask.cmd);
+    public void killTask(ExecutorDriver driver, TaskID taskId) {
+          log.info("Killing task : " + taskId.getValue());
 
-    startProcess(driver, masterNodeTask);
+        if (masterNodeTask != null && masterNodeTask.process != null) {
+            masterNodeTask.process.destroy();
+            masterNodeTask.process = null;
+      }
+      driver.sendStatusUpdate(TaskStatus.newBuilder()
+            .setTaskId(taskId)
+            .setState(TaskState.TASK_KILLED)
+            .build());
 
-    driver.sendStatusUpdate(TaskStatus.newBuilder()
-        .setTaskId(masterNodeTask.taskInfo.getTaskId())
-        .setState(TaskState.TASK_RUNNING)
-        .build());
+    }
 
-  }
+    public void launchTask(ExecutorDriver driver, TaskInfo taskInfo) {
 
-  public void shutdown(ExecutorDriver driver) {
+      log.info("launching master task");
+      // executorInfo = taskInfo.getExecutor();
+      Task task = new Task(taskInfo);
+      masterNodeTask = task;
+      // format case must be handled
+      // runCommand(driver, masterNodeTask, masterNodeTask.cmd);
 
-    log.info("Executor asked to shutdown");
-    killTask(driver, masterNodeTask.taskInfo.getTaskId());
-  }
+      startProcess(driver, masterNodeTask);
 
-  public static void main(String[] args) throws Exception {
-    MesosExecutorDriver driver = new MesosExecutorDriver(new TachyonMasterExecutor(
-        SchedulerConf.getInstance()));
-    System.exit(driver.run() == Status.DRIVER_STOPPED ? 0 : 1);
-  }
+      driver.sendStatusUpdate(TaskStatus.newBuilder()
+            .setTaskId(masterNodeTask.taskInfo.getTaskId())
+            .setState(TaskState.TASK_RUNNING)
+            .build());
 
+    }
+
+    public void shutdown(ExecutorDriver driver) {
+
+        log.info("Executor asked to shutdown");
+        killTask(driver, masterNodeTask.taskInfo.getTaskId());
+    }
+
+    public static void main(String[] args) throws Exception {
+        MesosExecutorDriver driver = new MesosExecutorDriver(
+                                   new TachyonMasterExecutor(
+                                       SchedulerConf.getInstance()));
+        System.exit(driver.run() == Status.DRIVER_STOPPED ? 0 : 1);
+    }
 }
