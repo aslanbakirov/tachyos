@@ -55,9 +55,10 @@ public class TachyonWorkerExecutor extends AbstractNodeExecutor {
     Task task = new Task(taskInfo);
     workerNodeTask = task;
 
-    runCommand(driver, workerNodeTask, workerNodeTask.cmd);
+    log.info("launching worker task");
+    // runCommand(driver, workerNodeTask, workerNodeTask.cmd);
 
-    // startProcess(driver, workerNodeTask);
+    startProcess(driver, workerNodeTask);
 
     driver.sendStatusUpdate(TaskStatus.newBuilder()
         .setTaskId(workerNodeTask.taskInfo.getTaskId())

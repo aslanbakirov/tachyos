@@ -102,11 +102,11 @@ public class SchedulerConf {
   }
 
   public String getMasterExecutorCpus() {
-    return getConf().getProperty("mesos.tachyon.master.executor.cpus", "1.0");
+    return getConf().getProperty("mesos.tachyon.master.executor.cpus", "0.5");
   }
 
   public String getMasterExecutorMem() {
-    return getConf().getProperty("mesos.tachyon.master.mem", "1024");
+    return getConf().getProperty("mesos.tachyon.master.mem", "512");
   }
 
   public String getTachyonHome() {
@@ -118,7 +118,7 @@ public class SchedulerConf {
   }
 
   public String getFailoverTimeout() {
-    return getConf().getProperty("mesos.failover.timeout.sec", "31449600");
+    return getConf().getProperty("mesos.failover.timeout.sec", "120");
   }
 
   // TODO will be changed in Mesos //for now it is mesosadm
