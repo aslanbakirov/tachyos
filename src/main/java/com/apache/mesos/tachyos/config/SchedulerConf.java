@@ -4,6 +4,8 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Properties;
 
+import org.eclipse.jetty.util.log.Log;
+
 public class SchedulerConf {
 
   private static SchedulerConf instance = null;
@@ -52,6 +54,17 @@ public class SchedulerConf {
     return getConf().getProperty("tachyon.web.port", "19999");
   }
 
+  public String getTachyonWebUri() {
+    try {
+      String hostname = java.net.InetAddress.getLocalHost().getHostName();
+      String port = getTachyonWebPort();
+      return "http://" + hostname + ":" + port;
+    } catch (UnknownHostException e) {
+      e.printStackTrace();
+    }
+    return "";
+  }
+
   public String getTachyonSelectorThreads() {
     return getConf().getProperty("tachyon.master.selector.threads", "3");
   }
@@ -94,11 +107,11 @@ public class SchedulerConf {
   }
 
   public String getWorkerExecutorCpus() {
-    return getConf().getProperty("mesos.tachyon.worker.executor.cpus", "1.0");
+    return getConf().getProperty("mesos.tachyon.worker.executor.cpus", "0.5");
   }
 
   public String getWorkerExecutorMem() {
-    return getConf().getProperty("mesos.tachyon.worker.mem", "1024");
+    return getConf().getProperty("mesos.tachyon.worker.mem", "512");
   }
 
   public String getMasterExecutorCpus() {
@@ -128,7 +141,7 @@ public class SchedulerConf {
 
   // TODO This role needs to be updated.
   public String getTachyonRole() {
-    return getConf().getProperty("mesos.tachyon.role", "slave_public");
+    return getConf().getProperty("mesos.tachyon.role", "*");
   }
 
   // TODO will be changed, do it better with ZK or DNS stuff...

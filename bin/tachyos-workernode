@@ -18,6 +18,7 @@ trap "{ $DIR/tachyos-killtree "$$" ; exit 0; }" EXIT
 
 function run_workernode() {
    $TACHYON_HOME/bin/tachyon-start.sh worker Mount
+   export PATH=$PATH:$TACHYON_HOME/bin
 }
 
 run_workernode

@@ -20,6 +20,7 @@ trap "{ $DIR/tachyos-killtree "$$" ; exit 0; }" EXIT
 function run_masternode() {
     $TACHYON_HOME/bin/tachyon format
     $TACHYON_HOME/bin/tachyon-start.sh master
+    export PATH=$PATH:$TACHYON_HOME/bin
 }
 
 run_masternode
