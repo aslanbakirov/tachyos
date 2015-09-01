@@ -1,7 +1,6 @@
 package com.apache.mesos.tachyos;
 
-import java.io.IOException;
-import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -23,8 +22,10 @@ import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
+import org.apache.mesos.Protos.TaskState;
 import org.apache.mesos.Protos.TaskStatus;
 import org.apache.mesos.Protos.Value;
+import org.apache.mesos.Protos.Value.Range;
 import org.apache.mesos.SchedulerDriver;
 
 import com.apache.mesos.tachyos.config.SchedulerConf;
@@ -32,7 +33,7 @@ import com.apache.mesos.tachyos.util.TachyonConstants;
 import com.google.protobuf.ByteString;
 
 /**
- * This is Scheduler class of Tachyos Framework
+ * This is the scheduler class of Tachyos Framework
  * @author Aslan Bakirov
  *
  */
@@ -41,8 +42,17 @@ public class Scheduler implements org.apache.mesos.Scheduler, Runnable {
   public static final Log log = LogFactory.getLog(Scheduler.class);
   private static final SchedulerConf conf =SchedulerConf.getInstance();
   private Set<String> workers = new HashSet<>();
-  private boolean masterStarted=false;
-  int tasksCreated=0;
+  boolean masterStarted=false;
+  boolean masterStaging = false;
+  boolean workersStarted = false;
+  int tasksCreated=1;
+  int workerCount=0;
+  TaskID masterTaskId;
+  
+  //TODO (aslan) Since AWS account, I am loading dependencies from folder which dcos automatically creates ,
+  // will be changed to downloads.....
+  public static String dependencyURL="https://s3-us-west-2.amazonaws.com/aslan-15qwg5t-exhibitors3bucket-1t8wfhypk0oiq/";
+  
   
 /**
  * This method creates FrameworkInfo to pass as a parameter to MesosSchedulerDriver
@@ -52,6 +62,7 @@ public void run() {
 		        .setName(conf.getFrameworkName())
 		        .setFailoverTimeout(new Double(conf.getFailoverTimeout()))
 		        .setUser(conf.getTachyonUser())
+		        .setWebuiUrl(conf.getTachyonWebUri())
 		        .setRole(conf.getTachyonRole())
 		        .setCheckpoint(true);
 
@@ -121,51 +132,66 @@ public void run() {
   }
 
   public void statusUpdate(SchedulerDriver driver, TaskStatus taskStatus) {
-    // TODO Auto-generated method stub
-
+	  
+    if(taskStatus.getTaskId().equals(masterTaskId) && taskStatus.getState().equals(TaskState.TASK_RUNNING)){
+    	log.info("master started : " + masterStarted);
+    	masterStarted = true;
+    	masterStaging = false;
+    }
+    
   }
 
   /**
    * This method creates and starts Tachyon master node if not stated yet. In addition, creates worker nodes if master is alive.
    */
 public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
-   
-	 
+    
  	 for (Offer offer : offers) {
 		 
 		 List<TaskInfo> tasks = new ArrayList<>();
 	     log.info("Got resource offer from hostname:"+offer.getHostname());
 	     
-	     if(!masterStarted){
+	     //TODO (aslan) Check locality of tachyon master and scheduler on the same machine because of NGINX routing.
+	     if(!masterStarted && !masterStaging && checkLocality(offer.getHostname())){
+	    	 
 	    	 log.info("Starting Tachyon master on "+offer.getHostname());
-		        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.MASTER_NODE_ID+":"+tasksCreated).build();
+	    	 
+		        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.MASTER_NODE_ID).build();
+		        
+		        masterTaskId = taskId;
+		        
 		        TaskInfo task = TaskInfo
 		                .newBuilder()
-		                .setName("task " + taskId.getValue())
+		                .setName(taskId.getValue())
 		                .setTaskId(taskId)
 		                .setSlaveId(offer.getSlaveId())
 		                .addResources(
 		                    Resource.newBuilder().setName("cpus").setType(Value.Type.SCALAR)
-		                        .setScalar(Value.Scalar.newBuilder().setValue(Double.parseDouble(conf.getMasterExecutorCpus()))))
+		                        .setScalar(Value.Scalar.newBuilder().setValue(Double.parseDouble(conf.getMasterExecutorCpus()))).setRole(conf.getTachyonRole()))
 		                .addResources(
 		                    Resource.newBuilder().setName("mem").setType(Value.Type.SCALAR)
-		                        .setScalar(Value.Scalar.newBuilder().setValue(Double.parseDouble(conf.getMasterExecutorMem()))))
+		                        .setScalar(Value.Scalar.newBuilder().setValue(Double.parseDouble(conf.getMasterExecutorMem()))).setRole(conf.getTachyonRole()))
+		                .addResources(Resource.newBuilder().setName("ports").setType(Value.Type.RANGES)
+		                		.setRanges(Value.Ranges.newBuilder().addAllRange(getMasterPortRange())).setRole(conf.getTachyonRole()))
 		                .setExecutor(getTachyonMasterExecutor())
-		                .setData(ByteString.copyFromUtf8("tachyon-mesos/bin/tachyos-masternode"))
+		                .setData(ByteString.copyFromUtf8("./tachyos-masternode"))
 		                .build();
-
+		        
 		        tasks.add(task);
-		        tasksCreated = tasksCreated + 1;
+		        
 		        driver.launchTasks(Arrays.asList(offer.getId()), tasks);
-		        masterStarted=true;
+		        masterStaging=true;
+		        workers.add(offer.getHostname());
+		        
 	     }
 	     
-	     if(!workers.contains(offer.getHostname()) && masterStarted){  
+	     else if(!workers.contains(offer.getHostname()) && masterStarted){  
 	        log.info("Starting Tachyon worker on "+offer.getHostname());
-	        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.WORKER_NODE_ID+":"+tasksCreated).build();
+	        
+	        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.WORKER_NODE_ID+""+tasksCreated).build();
 	        TaskInfo task = TaskInfo
 	                .newBuilder()
-	                .setName("task " + taskId.getValue())
+	                .setName(taskId.getValue())
 	                .setTaskId(taskId)
 	                .setSlaveId(offer.getSlaveId())
 	                .addResources(
@@ -174,7 +200,7 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 	                .addResources(
 	                    Resource.newBuilder().setName("mem").setType(Value.Type.SCALAR)
 	                        .setScalar(Value.Scalar.newBuilder().setValue(Double.parseDouble(conf.getWorkerExecutorMem()))))
-	                .setExecutor(getTachyonWorkerExecutor()).setData(ByteString.copyFromUtf8("tachyon-mesos/bin/tachyos-workernode"))
+	                .setExecutor(getTachyonWorkerExecutor()).setData(ByteString.copyFromUtf8("./tachyos-workernode"))
 	                .build();
 
 	        tasks.add(task);
@@ -187,7 +213,6 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 	        driver.declineOffer(offer.getId());
 	      }
 	    }
-	
 }
 
 
@@ -201,37 +226,38 @@ public void slaveLost(SchedulerDriver driver, SlaveID slaveID) {
 
 
 /**
- * This method check whether a port is available or not
- * @param port port to be checked
- * @return true if port is available, false if port already in use.
- */
-private static boolean available(int port) {
-    try (ServerSocket ignored = new ServerSocket(port)) {
-        return true;
-    } catch (IOException ignored) {
-        return false;
-    }
-}
-/**
  * This method creates ExecutorInfo for tachyos framework
  * @return Returns ExecutorInfo for tachyos framework
  */
 
 private static ExecutorInfo getTachyonWorkerExecutor(){
 
-	//String path = System.getProperty("user.dir") + "/tachyos-0.0.1-uber.jar";
-	String path = "/home/mesosadm/Development/tachyon-mesos.tgz";
-    CommandInfo.URI uri = CommandInfo.URI.newBuilder().setValue(path).setExtract(true).build();
+	String path=dependencyURL + "tachyos-0.0.1-uber.jar";	
+	String tachyonPath =dependencyURL + "tachyon-0.7.0-bin.tgz";
+	String pathSh= dependencyURL + "tachyos-workernode";
+	String killTreeSh =dependencyURL + "tachyos-killtree";
+	String tachyonEnvSh =dependencyURL + "tachyon-env.sh";
+	
+	CommandInfo.URI uri = CommandInfo.URI.newBuilder().setValue(path).setExtract(true).build();
+	
+	CommandInfo.URI tachyonUri = CommandInfo.URI.newBuilder().setValue(tachyonPath).setExtract(true).build();
+
+	CommandInfo.URI uriSh = CommandInfo.URI.newBuilder().setValue(pathSh).setExecutable(true).build();
     
-	String commandTachyonWorkerExecutor = "java -cp tachyon-mesos/tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonWorkerExecutor"; 
+	CommandInfo.URI killtreeSh = CommandInfo.URI.newBuilder().setValue(killTreeSh).setExecutable(true).build();
+	
+	CommandInfo.URI tachyonEnvUri = CommandInfo.URI.newBuilder().setValue(tachyonEnvSh).setExecutable(true).build();
+	
+	String commandTachyonWorkerExecutor = "export PATH=$PATH:/opt/mesosphere/bin && cp tachyon-env.sh tachyon-0.7.0/conf && cd tachyon-0.7.0 && export TACHYON_HOME=$(pwd) && export PATH=$PATH:$TACHYON_HOME/bin && cd .. && java -cp tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonWorkerExecutor"; 
 	
 	log.info("commandTachyonWorkerExecutor:" + commandTachyonWorkerExecutor);
 	
-    CommandInfo commandInfoTachyon = CommandInfo.newBuilder().setValue(commandTachyonWorkerExecutor).addUris(uri).build();	
+    CommandInfo commandInfoTachyon = CommandInfo.newBuilder().setValue(commandTachyonWorkerExecutor).addUris(uri).addUris(uriSh).addUris(tachyonUri)
+    		.addUris(killtreeSh).addUris(tachyonEnvUri).build();	
 	
    ExecutorInfo executor= ExecutorInfo.newBuilder()
    .setExecutorId(ExecutorID.newBuilder().setValue("TachyonWorkerExecutor"))
-   .setCommand(commandInfoTachyon)
+   .setCommand(commandInfoTachyon).addAllResources(getWorkerExecutorResources())
    .setName("Tachyon Worker Executor (Java)").setSource("java").build();
 
 return executor;
@@ -239,23 +265,104 @@ return executor;
 
 private static ExecutorInfo getTachyonMasterExecutor(){
 
-	//String path = System.getProperty("user.dir") + "/tachyos-0.0.1-uber.jar";
-	String path = "/home/mesosadm/Development/tachyon-mesos.tgz";
-    CommandInfo.URI uri = CommandInfo.URI.newBuilder().setValue(path).setExtract(true).build();
+	String path=dependencyURL + "tachyos-0.0.1-uber.jar";	
+	String tachyonPath =dependencyURL + "tachyon-0.7.0-bin.tgz";
+	String pathSh =dependencyURL + "tachyos-masternode";
+	String killTreeSh =dependencyURL + "tachyos-killtree";
+
+	CommandInfo.URI uri = CommandInfo.URI.newBuilder().setValue(path).setExtract(true).build();
+	
+	CommandInfo.URI tahcyonUri = CommandInfo.URI.newBuilder().setValue(tachyonPath).setExtract(true).build();
+	
+	CommandInfo.URI uriSh = CommandInfo.URI.newBuilder().setValue(pathSh).setExecutable(true).build();
     
-	String commandTachyonMasterExecutor = "java -cp tachyon-mesos/tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonMasterExecutor"; 
+	CommandInfo.URI killtreeSh = CommandInfo.URI.newBuilder().setValue(killTreeSh).setExecutable(true).build();
+	
+	String commandTachyonMasterExecutor = "export PATH=$PATH:/opt/mesosphere/bin && cd tachyon-0.7.0 && export TACHYON_HOME=$(pwd) && export PATH=$PATH:$TACHYON_HOME/bin && cd .. && java -cp tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonMasterExecutor"; 
 	
 	log.info("commandTachyonMasterExecutor:" + commandTachyonMasterExecutor);
 	
-    CommandInfo commandInfoTachyon = CommandInfo.newBuilder().setValue(commandTachyonMasterExecutor).addUris(uri).build();	
+    CommandInfo commandInfoTachyon = CommandInfo.newBuilder().setValue(commandTachyonMasterExecutor).addUris(uri).addUris(uriSh).addUris(tahcyonUri).addUris(killtreeSh).build();	
 	
    ExecutorInfo executor= ExecutorInfo.newBuilder()
    .setExecutorId(ExecutorID.newBuilder().setValue("TachyonMasterExecutor"))
-   .setCommand(commandInfoTachyon)
+   .setCommand(commandInfoTachyon).addAllResources(getMasterExecutorResources())
    .setName("Tachyon Master Executor (Java)").setSource("java").build();
 
 return executor;
 }
 
+public void sendMessageTo(SchedulerDriver driver, TaskID taskId,
+	      SlaveID slaveID, String message) {
+	    log.info(String.format("Sending message '%s' to taskId=%s, slaveId=%s", message,
+	        taskId.getValue(), slaveID.getValue()));
+	    String postfix = taskId.getValue();
+	    postfix = postfix.substring(postfix.indexOf(".") + 1, postfix.length());
+	    postfix = postfix.substring(postfix.indexOf(".") + 1, postfix.length());
+	    driver.sendFrameworkMessage(
+	        ExecutorID.newBuilder().setValue("executor." + postfix).build(),
+	        slaveID,
+	        message.getBytes());
+	  }
+
+
+private static List<Resource> getMasterExecutorResources() {
+    return Arrays.asList(
+      Resource.newBuilder()
+        .setName("cpus")
+        .setType(Value.Type.SCALAR)
+        .setScalar(Value.Scalar.newBuilder()
+          .setValue(Double.parseDouble(conf.getMasterExecutorCpus())).build())
+        .setRole(conf.getTachyonRole())
+        .build(),
+      Resource.newBuilder()
+        .setName("mem")
+        .setType(Value.Type.SCALAR)
+        .setScalar(Value.Scalar.newBuilder()
+          .setValue(Double.parseDouble(conf.getMasterExecutorMem())).build())
+        .setRole(conf.getTachyonRole())
+        .build());
+  }
+
+private static List<Resource> getWorkerExecutorResources() {
+    return Arrays.asList(
+      Resource.newBuilder()
+        .setName("cpus")
+        .setType(Value.Type.SCALAR)
+        .setScalar(Value.Scalar.newBuilder()
+          .setValue(Double.parseDouble(conf.getWorkerExecutorCpus())).build())
+        .build(),
+      Resource.newBuilder()
+        .setName("mem")
+        .setType(Value.Type.SCALAR)
+        .setScalar(Value.Scalar.newBuilder()
+          .setValue(Double.parseDouble(conf.getWorkerExecutorMem())).build())
+        .build());
+  }
+
+/**
+ * Port range for tachyon web server and tachyon master and workers.
+ */
+private static List<Range> getMasterPortRange(){
+
+	List<Range> result = new ArrayList<Range>();
+	result.add(Value.Range.newBuilder().setBegin(19990).setEnd(20000).build());
+	return result;
+}
+
+
+/**
+ * 
+ * @param hostname
+ * @return true if hostname of resource offer and scheduler are on the same machine
+ */
+private static boolean checkLocality(String hostname){
+	try {
+		return java.net.InetAddress.getLocalHost().getHostName().equals(hostname);
+	} catch (UnknownHostException e) {
+		e.printStackTrace();
+	}
+	return false;
+}
 
 }

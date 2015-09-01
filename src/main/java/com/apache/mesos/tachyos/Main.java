@@ -5,8 +5,10 @@ import org.apache.commons.logging.LogFactory;
 
 /**
  * 
- * @author Aslan Bakirov Main class of Tachyon on Mesos framework. Framework scheduler is
- *         initialized and started in main method.
+ * @author Aslan Bakirov
+ * 
+ *         Main class of Tachyon on Mesos framework. Framework scheduler is initialized and started
+ *         in main method.
  * 
  */
 public class Main {

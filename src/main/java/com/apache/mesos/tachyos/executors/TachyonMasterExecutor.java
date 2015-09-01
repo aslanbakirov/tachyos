@@ -51,11 +51,9 @@ public class TachyonMasterExecutor extends AbstractNodeExecutor {
 
   public void launchTask(ExecutorDriver driver, TaskInfo taskInfo) {
 
-    executorInfo = taskInfo.getExecutor();
+    log.info("launching master task");
     Task task = new Task(taskInfo);
     masterNodeTask = task;
-    // format case must be handled
-    // runCommand(driver, masterNodeTask, "tachyon-mesos/bin/tacyhos-masternode");
 
     startProcess(driver, masterNodeTask);
 

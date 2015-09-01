@@ -4,6 +4,8 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Properties;
 
+import org.eclipse.jetty.util.log.Log;
+
 public class SchedulerConf {
 
   private static SchedulerConf instance = null;
@@ -21,7 +23,7 @@ public class SchedulerConf {
   }
 
   public boolean usingMesosDns() {
-    return Boolean.valueOf(getConf().getProperty("mesos.tachyon.mesosdns", "false"));
+    return Boolean.valueOf(getConf().getProperty("mesos.tachyon.mesosdns", "true"));
   }
 
   public String getMesosDnsDomain() {
@@ -52,6 +54,17 @@ public class SchedulerConf {
     return getConf().getProperty("tachyon.web.port", "19999");
   }
 
+  public String getTachyonWebUri() {
+    try {
+      String hostname = java.net.InetAddress.getLocalHost().getHostName();
+      String port = getTachyonWebPort();
+      return "http://" + hostname + ":" + port;
+    } catch (UnknownHostException e) {
+      e.printStackTrace();
+    }
+    return "";
+  }
+
   public String getTachyonSelectorThreads() {
     return getConf().getProperty("tachyon.master.selector.threads", "3");
   }
@@ -67,6 +80,14 @@ public class SchedulerConf {
 
   public String getMesosMasterPort() {
     return getConf().getProperty("mesos.master.port", "5050");
+  }
+
+  public String getStateZkServers() {
+    return getConf().getProperty("mesos.hdfs.state.zk", "localhost:2181");
+  }
+
+  public String getStateZkTimeout() {
+    return getConf().getProperty("mesos.hdfs.state.zk.timeout.ms", "20000");
   }
 
   public String getJvmOpts() {
@@ -86,19 +107,19 @@ public class SchedulerConf {
   }
 
   public String getWorkerExecutorCpus() {
-    return getConf().getProperty("mesos.tachyon.worker.executor.cpus", "1.0");
+    return getConf().getProperty("mesos.tachyon.worker.executor.cpus", "0.5");
   }
 
   public String getWorkerExecutorMem() {
-    return getConf().getProperty("mesos.tachyon.worker.mem", "1024");
+    return getConf().getProperty("mesos.tachyon.worker.mem", "512");
   }
 
   public String getMasterExecutorCpus() {
-    return getConf().getProperty("mesos.tachyon.master.executor.cpus", "1.0");
+    return getConf().getProperty("mesos.tachyon.master.executor.cpus", "0.5");
   }
 
   public String getMasterExecutorMem() {
-    return getConf().getProperty("mesos.tachyon.master.mem", "1024");
+    return getConf().getProperty("mesos.tachyon.master.mem", "512");
   }
 
   public String getTachyonHome() {
@@ -106,11 +127,11 @@ public class SchedulerConf {
   }
 
   public String getFrameworkName() {
-    return getConf().getProperty("mesos.tachyon.framework.name", "TachyonMesos");
+    return getConf().getProperty("mesos.tachyon.framework.name", "tachyon");
   }
 
   public String getFailoverTimeout() {
-    return getConf().getProperty("mesos.failover.timeout.sec", "31449600");
+    return getConf().getProperty("mesos.failover.timeout.sec", "120");
   }
 
   // TODO will be changed in Mesos //for now it is mesosadm
@@ -125,7 +146,8 @@ public class SchedulerConf {
 
   // TODO will be changed, do it better with ZK or DNS stuff...
   public String getMesosMasterUri() {
-    return getConf().getProperty("mesos.master.uri", "localhost:5050");
+    return getConf().getProperty("mesos.master.uri", "zk://master.mesos:2181/mesos");
+    // return getConf().getProperty("mesos.master.uri", "192.168.1.48:5050");
   }
 
   public String getDataDir() {

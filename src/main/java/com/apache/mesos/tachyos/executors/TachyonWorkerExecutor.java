@@ -55,7 +55,7 @@ public class TachyonWorkerExecutor extends AbstractNodeExecutor {
     Task task = new Task(taskInfo);
     workerNodeTask = task;
 
-    // runCommand(driver, workerNodeTask, "tachyon-mesos/bin/tacyhos-workernode");
+    log.info("launching worker task");
 
     startProcess(driver, workerNodeTask);
 
