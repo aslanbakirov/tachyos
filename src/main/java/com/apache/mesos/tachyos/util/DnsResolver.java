@@ -50,7 +50,6 @@ public class DnsResolver {
   public void sendMessageAfterMasterNodeResolvable(final SchedulerDriver driver,
       final Protos.TaskID taskId, final Protos.SlaveID slaveID, final String message) {
     if (!conf.usingMesosDns()) {
-      // short circuit since Mesos handles this otherwise
       scheduler.sendMessageTo(driver, taskId, slaveID, message);
       return;
     }

@@ -5,6 +5,7 @@ public class TachyonConstants {
   // Total number of Master nodes
   // Note: this version supports 1 master node
   public static final Integer TOTAL_MASTER_NODES = 1;
+  public static final Integer TOTAL_WORKER_NODES = 4;
 
   // NodeIds
   public static final String MASTER_NODE_ID = "masternode";

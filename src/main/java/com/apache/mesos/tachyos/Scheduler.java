@@ -1,7 +1,6 @@
 package com.apache.mesos.tachyos;
 
-import java.io.IOException;
-import java.net.ServerSocket;
+import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashSet;
@@ -11,7 +10,6 @@ import java.util.Set;
 import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.mesos.MesosSchedulerDriver;
-import org.apache.mesos.Protos.Attribute;
 import org.apache.mesos.Protos.CommandInfo;
 import org.apache.mesos.Protos.ExecutorID;
 import org.apache.mesos.Protos.ExecutorInfo;
@@ -22,7 +20,6 @@ import org.apache.mesos.Protos.Offer;
 import org.apache.mesos.Protos.OfferID;
 import org.apache.mesos.Protos.Resource;
 import org.apache.mesos.Protos.SlaveID;
-import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
 import org.apache.mesos.Protos.TaskState;
@@ -36,7 +33,7 @@ import com.apache.mesos.tachyos.util.TachyonConstants;
 import com.google.protobuf.ByteString;
 
 /**
- * This is Scheduler class of Tachyos Framework
+ * This is the scheduler class of Tachyos Framework
  * @author Aslan Bakirov
  *
  */
@@ -47,8 +44,15 @@ public class Scheduler implements org.apache.mesos.Scheduler, Runnable {
   private Set<String> workers = new HashSet<>();
   boolean masterStarted=false;
   boolean masterStaging = false;
+  boolean workersStarted = false;
   int tasksCreated=1;
+  int workerCount=0;
   TaskID masterTaskId;
+  
+  //TODO (aslan) Since AWS account, I am loading dependencies from folder which dcos automatically creates ,
+  // will be changed to downloads.....
+  public static String dependencyURL="https://s3-us-west-2.amazonaws.com/aslan-15qwg5t-exhibitors3bucket-1t8wfhypk0oiq/";
+  
   
 /**
  * This method creates FrameworkInfo to pass as a parameter to MesosSchedulerDriver
@@ -128,13 +132,13 @@ public void run() {
   }
 
   public void statusUpdate(SchedulerDriver driver, TaskStatus taskStatus) {
-	  log.info("master started out: " + masterStarted);
+	  
     if(taskStatus.getTaskId().equals(masterTaskId) && taskStatus.getState().equals(TaskState.TASK_RUNNING)){
     	log.info("master started : " + masterStarted);
     	masterStarted = true;
     	masterStaging = false;
     }
-	  
+    
   }
 
   /**
@@ -147,7 +151,8 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 		 List<TaskInfo> tasks = new ArrayList<>();
 	     log.info("Got resource offer from hostname:"+offer.getHostname());
 	     
-	     if(!masterStarted && !masterStaging){
+	     //TODO (aslan) Check locality of tachyon master and scheduler on the same machine because of NGINX routing.
+	     if(!masterStarted && !masterStaging && checkLocality(offer.getHostname())){
 	    	 
 	    	 log.info("Starting Tachyon master on "+offer.getHostname());
 	    	 
@@ -174,7 +179,6 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 		        
 		        tasks.add(task);
 		        
-		        //tasksCreated = tasksCreated + 1;
 		        driver.launchTasks(Arrays.asList(offer.getId()), tasks);
 		        masterStaging=true;
 		        workers.add(offer.getHostname());
@@ -228,22 +232,11 @@ public void slaveLost(SchedulerDriver driver, SlaveID slaveID) {
 
 private static ExecutorInfo getTachyonWorkerExecutor(){
 
-	//String path = System.getProperty("user.dir") + "/tachyos-0.0.1-uber.jar";
-	
-	//String path ="/Users/aslan/Developement/mesosphereWS/tachyos/target/tachyos-0.0.1-uber.jar";
-	String path="https://s3-us-west-1.amazonaws.com/aslantest-exhibitors3bucket-1ccmzwr7nl8n0/tachyos-0.0.1-uber.jar";	
-	log.info("path : "+ path);
-	
-	//String tachyonPath ="/Users/aslan/Developement/mesosphereWS/tachyos/tachyon-0.7.0-bin.tgz";
-	String tachyonPath ="https://s3-us-west-1.amazonaws.com/aslantest-exhibitors3bucket-1ccmzwr7nl8n0/tachyon-0.7.0-bin.tgz";
-	
-	//String pathSh = "/Users/aslan/Developement/mesosphereWS/tachyos/bin/tachyos-workernode";
-	String pathSh= "https://s3-us-west-1.amazonaws.com/aslantest-exhibitors3bucket-1ccmzwr7nl8n0/tachyos-workernode";
-	
-	String killTreeSh ="https://s3-us-west-1.amazonaws.com/aslantest-exhibitors3bucket-1ccmzwr7nl8n0/tachyos-killtree";
-	
-	String tachyonEnvSh ="https://s3-us-west-1.amazonaws.com/aslantest-exhibitors3bucket-1ccmzwr7nl8n0/tachyon-env.sh";
-	
+	String path=dependencyURL + "tachyos-0.0.1-uber.jar";	
+	String tachyonPath =dependencyURL + "tachyon-0.7.0-bin.tgz";
+	String pathSh= dependencyURL + "tachyos-workernode";
+	String killTreeSh =dependencyURL + "tachyos-killtree";
+	String tachyonEnvSh =dependencyURL + "tachyon-env.sh";
 	
 	CommandInfo.URI uri = CommandInfo.URI.newBuilder().setValue(path).setExtract(true).build();
 	
@@ -255,7 +248,7 @@ private static ExecutorInfo getTachyonWorkerExecutor(){
 	
 	CommandInfo.URI tachyonEnvUri = CommandInfo.URI.newBuilder().setValue(tachyonEnvSh).setExecutable(true).build();
 	
-	String commandTachyonWorkerExecutor = "cp tachyon-env.sh tachyon-0.7.0/conf && cd tachyon-0.7.0 && export TACHYON_HOME=$(pwd) && export PATH=$PATH:$TACHYON_HOME/bin && cd .. && java -cp tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonWorkerExecutor"; 
+	String commandTachyonWorkerExecutor = "export PATH=$PATH:/opt/mesosphere/bin && cp tachyon-env.sh tachyon-0.7.0/conf && cd tachyon-0.7.0 && export TACHYON_HOME=$(pwd) && export PATH=$PATH:$TACHYON_HOME/bin && cd .. && java -cp tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonWorkerExecutor"; 
 	
 	log.info("commandTachyonWorkerExecutor:" + commandTachyonWorkerExecutor);
 	
@@ -272,18 +265,11 @@ return executor;
 
 private static ExecutorInfo getTachyonMasterExecutor(){
 
-	//String path = "/Users/aslan/Developement/mesosphereWS/tachyos/target/tachyos-0.0.1-uber.jar";
-	String path="https://s3-us-west-1.amazonaws.com/aslantest-exhibitors3bucket-1ccmzwr7nl8n0/tachyos-0.0.1-uber.jar";	
-	
-	log.info("path : "+ path);
-	//String tachyonPath = "/Users/aslan/Developement/mesosphereWS/tachyos/tachyon-0.7.0-bin.tgz";
-	String tachyonPath ="https://s3-us-west-1.amazonaws.com/aslantest-exhibitors3bucket-1ccmzwr7nl8n0/tachyon-0.7.0-bin.tgz";
-	
-	//String pathSh = "/Users/aslan/Developement/mesosphereWS/tachyos/bin/tachyos-masternode";
-	String pathSh ="https://s3-us-west-1.amazonaws.com/aslantest-exhibitors3bucket-1ccmzwr7nl8n0/tachyos-masternode";
-	
-	String killTreeSh ="https://s3-us-west-1.amazonaws.com/aslantest-exhibitors3bucket-1ccmzwr7nl8n0/tachyos-killtree";
-	
+	String path=dependencyURL + "tachyos-0.0.1-uber.jar";	
+	String tachyonPath =dependencyURL + "tachyon-0.7.0-bin.tgz";
+	String pathSh =dependencyURL + "tachyos-masternode";
+	String killTreeSh =dependencyURL + "tachyos-killtree";
+
 	CommandInfo.URI uri = CommandInfo.URI.newBuilder().setValue(path).setExtract(true).build();
 	
 	CommandInfo.URI tahcyonUri = CommandInfo.URI.newBuilder().setValue(tachyonPath).setExtract(true).build();
@@ -291,9 +277,8 @@ private static ExecutorInfo getTachyonMasterExecutor(){
 	CommandInfo.URI uriSh = CommandInfo.URI.newBuilder().setValue(pathSh).setExecutable(true).build();
     
 	CommandInfo.URI killtreeSh = CommandInfo.URI.newBuilder().setValue(killTreeSh).setExecutable(true).build();
-    
 	
-	String commandTachyonMasterExecutor = "cd tachyon-0.7.0 && export TACHYON_HOME=$(pwd) && export PATH=$PATH:$TACHYON_HOME/bin && cd .. && java -cp tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonMasterExecutor"; 
+	String commandTachyonMasterExecutor = "export PATH=$PATH:/opt/mesosphere/bin && cd tachyon-0.7.0 && export TACHYON_HOME=$(pwd) && export PATH=$PATH:$TACHYON_HOME/bin && cd .. && java -cp tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonMasterExecutor"; 
 	
 	log.info("commandTachyonMasterExecutor:" + commandTachyonMasterExecutor);
 	
@@ -327,14 +312,14 @@ private static List<Resource> getMasterExecutorResources() {
         .setName("cpus")
         .setType(Value.Type.SCALAR)
         .setScalar(Value.Scalar.newBuilder()
-          .setValue(0.5).build())
+          .setValue(Double.parseDouble(conf.getMasterExecutorCpus())).build())
         .setRole(conf.getTachyonRole())
         .build(),
       Resource.newBuilder()
         .setName("mem")
         .setType(Value.Type.SCALAR)
         .setScalar(Value.Scalar.newBuilder()
-          .setValue(512).build())
+          .setValue(Double.parseDouble(conf.getMasterExecutorMem())).build())
         .setRole(conf.getTachyonRole())
         .build());
   }
@@ -345,21 +330,39 @@ private static List<Resource> getWorkerExecutorResources() {
         .setName("cpus")
         .setType(Value.Type.SCALAR)
         .setScalar(Value.Scalar.newBuilder()
-          .setValue(0.5).build())
+          .setValue(Double.parseDouble(conf.getWorkerExecutorCpus())).build())
         .build(),
       Resource.newBuilder()
         .setName("mem")
         .setType(Value.Type.SCALAR)
         .setScalar(Value.Scalar.newBuilder()
-          .setValue(512).build())
+          .setValue(Double.parseDouble(conf.getWorkerExecutorMem())).build())
         .build());
   }
 
+/**
+ * Port range for tachyon web server and tachyon master and workers.
+ */
 private static List<Range> getMasterPortRange(){
 
 	List<Range> result = new ArrayList<Range>();
 	result.add(Value.Range.newBuilder().setBegin(19990).setEnd(20000).build());
 	return result;
+}
+
+
+/**
+ * 
+ * @param hostname
+ * @return true if hostname of resource offer and scheduler are on the same machine
+ */
+private static boolean checkLocality(String hostname){
+	try {
+		return java.net.InetAddress.getLocalHost().getHostName().equals(hostname);
+	} catch (UnknownHostException e) {
+		e.printStackTrace();
+	}
+	return false;
 }
 
 }
