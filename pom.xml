@@ -16,7 +16,7 @@
 	<properties>
 		<encoding>UTF-8</encoding>
 		<java.abi>1.7</java.abi>
-		<mesos.version>0.22.1</mesos.version>
+		<mesos.version>0.23.0</mesos.version>
 		<slf4j.version>1.7.10</slf4j.version>
 		<jetty.version>8.1.15.v20140411</jetty.version>
 		<tachyon.version>0.6.4</tachyon.version>
