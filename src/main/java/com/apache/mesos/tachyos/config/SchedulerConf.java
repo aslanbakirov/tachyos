@@ -162,6 +162,15 @@ public class SchedulerConf {
     return getConf().getProperty("mesos.tachyon.framework.mnt.path", "/opt/mesosphere");
   }
 
+  public String getJreVersion() {
+    return getConf().getProperty("mesos.hdfs.jre-version", "jre1.7.0_76");
+  }
+
+  public String getJreUrl() {
+    return getConf().getProperty("mesos.hdfs.jre-url",
+        "https://downloads.mesosphere.io/java/jre-7u76-linux-x64.tar.gz");
+  }
+
   public String getFrameworkHostAddress() {
     String hostAddress = getConf().getProperty("mesos.tachyon.framework.hostaddress");
     if (hostAddress == null) {

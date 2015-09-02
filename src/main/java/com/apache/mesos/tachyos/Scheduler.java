@@ -48,11 +48,8 @@ public class Scheduler implements org.apache.mesos.Scheduler, Runnable {
   int tasksCreated=1;
   int workerCount=0;
   TaskID masterTaskId;
-  
-  //TODO (aslan) Since AWS account, I am loading dependencies from folder which dcos automatically creates ,
-  // will be changed to downloads.....
-  public static String dependencyURL="https://s3-us-west-2.amazonaws.com/aslan-15qwg5t-exhibitors3bucket-1t8wfhypk0oiq/";
-  
+ 
+  public static String dependencyURL="https://s3.amazonaws.com/downloads.mesosphere.io/tachyon/";
   
 /**
  * This method creates FrameworkInfo to pass as a parameter to MesosSchedulerDriver
@@ -248,11 +245,16 @@ private static ExecutorInfo getTachyonWorkerExecutor(){
 	
 	CommandInfo.URI tachyonEnvUri = CommandInfo.URI.newBuilder().setValue(tachyonEnvSh).setExecutable(true).build();
 	
-	String commandTachyonWorkerExecutor = "export PATH=$PATH:/opt/mesosphere/bin && cp tachyon-env.sh tachyon-0.7.0/conf && cd tachyon-0.7.0 && export TACHYON_HOME=$(pwd) && export PATH=$PATH:$TACHYON_HOME/bin && cd .. && java -cp tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonWorkerExecutor"; 
+	CommandInfo.URI jre = CommandInfo.URI.newBuilder().setValue(conf.getJreUrl()).setExtract(true).build();
+	
+	String commandTachyonWorkerExecutor = "export JAVA_HOME="+conf.getJreVersion() + " && "
+			+ "export PATH=$PATH:$JAVA_HOME/bin && cp tachyon-env.sh tachyon-0.7.0/conf && cd tachyon-0.7.0 && "
+			+ "export TACHYON_HOME=$(pwd) && export PATH=$PATH:$TACHYON_HOME/bin && cd .. && "
+			+ "java -cp tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonWorkerExecutor"; 
 	
 	log.info("commandTachyonWorkerExecutor:" + commandTachyonWorkerExecutor);
 	
-    CommandInfo commandInfoTachyon = CommandInfo.newBuilder().setValue(commandTachyonWorkerExecutor).addUris(uri).addUris(uriSh).addUris(tachyonUri)
+    CommandInfo commandInfoTachyon = CommandInfo.newBuilder().setValue(commandTachyonWorkerExecutor).addUris(uri).addUris(uriSh).addUris(tachyonUri).addUris(jre)
     		.addUris(killtreeSh).addUris(tachyonEnvUri).build();	
 	
    ExecutorInfo executor= ExecutorInfo.newBuilder()
@@ -278,11 +280,17 @@ private static ExecutorInfo getTachyonMasterExecutor(){
     
 	CommandInfo.URI killtreeSh = CommandInfo.URI.newBuilder().setValue(killTreeSh).setExecutable(true).build();
 	
-	String commandTachyonMasterExecutor = "export PATH=$PATH:/opt/mesosphere/bin && cd tachyon-0.7.0 && export TACHYON_HOME=$(pwd) && export PATH=$PATH:$TACHYON_HOME/bin && cd .. && java -cp tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonMasterExecutor"; 
+	CommandInfo.URI jre = CommandInfo.URI.newBuilder().setValue(conf.getJreUrl()).setExtract(true).build();
+	
+	
+	String commandTachyonMasterExecutor = "export JAVA_HOME="+conf.getJreVersion() +" && " 
+			+ "export PATH=$PATH:$JAVA_HOME/bin && cd tachyon-0.7.0 && export TACHYON_HOME=$(pwd) && "
+			+ "export PATH=$PATH:$TACHYON_HOME/bin && cd .. && "
+			+ "java -cp tachyos-0.0.1-uber.jar com.apache.mesos.tachyos.executors.TachyonMasterExecutor"; 
 	
 	log.info("commandTachyonMasterExecutor:" + commandTachyonMasterExecutor);
 	
-    CommandInfo commandInfoTachyon = CommandInfo.newBuilder().setValue(commandTachyonMasterExecutor).addUris(uri).addUris(uriSh).addUris(tahcyonUri).addUris(killtreeSh).build();	
+    CommandInfo commandInfoTachyon = CommandInfo.newBuilder().setValue(commandTachyonMasterExecutor).addUris(uri).addUris(uriSh).addUris(tahcyonUri).addUris(killtreeSh).addUris(jre).build();	
 	
    ExecutorInfo executor= ExecutorInfo.newBuilder()
    .setExecutorId(ExecutorID.newBuilder().setValue("TachyonMasterExecutor"))
