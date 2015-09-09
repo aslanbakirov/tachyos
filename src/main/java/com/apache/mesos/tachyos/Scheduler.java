@@ -42,11 +42,11 @@ public class Scheduler implements org.apache.mesos.Scheduler, Runnable {
   public static final Log log = LogFactory.getLog(Scheduler.class);
   private static final SchedulerConf conf =SchedulerConf.getInstance();
   private Set<String> workers = new HashSet<>();
+  private Set<String> masters = new HashSet<>();
   boolean masterStarted=false;
   boolean masterStaging = false;
-  boolean workersStarted = false;
   int tasksCreated=1;
-  int workerCount=0;
+  int masterCount=0;
   TaskID masterTaskId;
  
   public static String dependencyURL="https://s3.amazonaws.com/downloads.mesosphere.io/tachyon/";
@@ -130,12 +130,15 @@ public void run() {
 
   public void statusUpdate(SchedulerDriver driver, TaskStatus taskStatus) {
 	  
-    if(taskStatus.getTaskId().equals(masterTaskId) && taskStatus.getState().equals(TaskState.TASK_RUNNING)){
-    	log.info("master started : " + masterStarted);
-    	masterStarted = true;
-    	masterStaging = false;
+    if(taskStatus.getTaskId().getValue().contains(TachyonConstants.MASTER_NODE_ID) && taskStatus.getState().equals(TaskState.TASK_RUNNING)){
+    	masterCount++;
     }
     
+    if(masterCount == TachyonConstants.TOTAL_MASTER_NODES){
+    	log.info("master started : " + masterStarted);
+    	masterStarted = true;
+    	//masterStaging = false;
+	}
   }
 
   /**
@@ -149,17 +152,17 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 	     log.info("Got resource offer from hostname:"+offer.getHostname());
 	     
 	     //TODO (aslan) Check locality of tachyon master and scheduler on the same machine because of NGINX routing.
-	     if(!masterStarted && !masterStaging && checkLocality(offer.getHostname())){
+	     if(!masterStarted && !masters.contains(offer.getHostname()) && masters.size() < TachyonConstants.TOTAL_MASTER_NODES){
 	    	 
 	    	 log.info("Starting Tachyon master on "+offer.getHostname());
 	    	 
-		        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.MASTER_NODE_ID).build();
+		        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.MASTER_NODE_ID + "." + System.currentTimeMillis()).build();
 		        
 		        masterTaskId = taskId;
 		        
 		        TaskInfo task = TaskInfo
 		                .newBuilder()
-		                .setName(taskId.getValue())
+		                .setName(TachyonConstants.MASTER_NODE_ID)
 		                .setTaskId(taskId)
 		                .setSlaveId(offer.getSlaveId())
 		                .addResources(
@@ -177,18 +180,17 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 		        tasks.add(task);
 		        
 		        driver.launchTasks(Arrays.asList(offer.getId()), tasks);
-		        masterStaging=true;
 		        workers.add(offer.getHostname());
-		        
+		        masters.add(offer.getHostname());
 	     }
 	     
 	     else if(!workers.contains(offer.getHostname()) && masterStarted){  
 	        log.info("Starting Tachyon worker on "+offer.getHostname());
 	        
-	        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.WORKER_NODE_ID+""+tasksCreated).build();
+	        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.WORKER_NODE_ID + System.currentTimeMillis()).build();
 	        TaskInfo task = TaskInfo
 	                .newBuilder()
-	                .setName(taskId.getValue())
+	                .setName(TachyonConstants.WORKER_NODE_ID+""+tasksCreated)
 	                .setTaskId(taskId)
 	                .setSlaveId(offer.getSlaveId())
 	                .addResources(

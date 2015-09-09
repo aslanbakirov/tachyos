@@ -23,4 +23,6 @@ function run_masternode() {
     export PATH=$PATH:$TACHYON_HOME/bin
 }
 
+sed -i -e s/TachyonMaster/$1/g $TACHYON_HOME/conf/tachyon-env.sh
+
 run_masternode

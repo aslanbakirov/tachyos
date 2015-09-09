@@ -87,6 +87,8 @@ export TACHYON_JAVA_OPTS+="
   -Dtachyon.master.journal.folder=$TACHYON_HOME/journal/
   -Dorg.apache.jasper.compiler.disablejsr199=true
   -Djava.net.preferIPv4Stack=true
+  -Dtachyon.usezookeeper=true
+  -Dtachyon.zookeeper.address=master.mesos:2181
 "
 
 # Master specific parameters. Default to TACHYON_JAVA_OPTS.
