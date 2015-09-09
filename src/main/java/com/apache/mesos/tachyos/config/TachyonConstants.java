@@ -1,4 +1,4 @@
-package com.apache.mesos.tachyos.util;
+package com.apache.mesos.tachyos.config;
 
 public class TachyonConstants {
 

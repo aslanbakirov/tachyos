@@ -23,17 +23,6 @@ public class TachyonWorkerExecutor extends AbstractNodeExecutor {
     super(schedulerConf);
   }
 
-  public void frameworkMessage(ExecutorDriver driver, byte[] msg) {
-    String messageStr = new String(msg);
-    log.info("Executor received framework message: " + messageStr);
-
-    driver.sendStatusUpdate(TaskStatus.newBuilder()
-        .setTaskId(workerNodeTask.taskInfo.getTaskId())
-        .setState(TaskState.TASK_RUNNING)
-        .setMessage(messageStr)
-        .build());
-  }
-
   public void killTask(ExecutorDriver driver, TaskID taskId) {
 
     log.info("Killing task : " + taskId.getValue());

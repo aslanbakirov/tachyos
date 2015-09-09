@@ -29,7 +29,7 @@ import org.apache.mesos.Protos.Value.Range;
 import org.apache.mesos.SchedulerDriver;
 
 import com.apache.mesos.tachyos.config.SchedulerConf;
-import com.apache.mesos.tachyos.util.TachyonConstants;
+import com.apache.mesos.tachyos.config.TachyonConstants;
 import com.google.protobuf.ByteString;
 
 /**

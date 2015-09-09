@@ -14,6 +14,7 @@ import org.apache.mesos.SchedulerDriver;
 
 import com.apache.mesos.tachyos.Scheduler;
 import com.apache.mesos.tachyos.config.SchedulerConf;
+import com.apache.mesos.tachyos.config.TachyonConstants;
 
 public class DnsResolver {
   public static final Log log = LogFactory.getLog(Scheduler.class);
