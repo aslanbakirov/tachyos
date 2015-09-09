@@ -4,8 +4,6 @@ import java.net.InetAddress;
 import java.net.UnknownHostException;
 import java.util.Properties;
 
-import org.eclipse.jetty.util.log.Log;
-
 public class SchedulerConf {
 
   private static SchedulerConf instance = null;
@@ -134,7 +132,6 @@ public class SchedulerConf {
     return getConf().getProperty("mesos.failover.timeout.sec", "120");
   }
 
-  // TODO will be changed in Mesos //for now it is mesosadm
   public String getTachyonUser() {
     return getConf().getProperty("mesos.tachyon.user", "root");
   }

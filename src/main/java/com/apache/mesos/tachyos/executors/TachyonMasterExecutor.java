@@ -7,7 +7,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.mesos.ExecutorDriver;
 import org.apache.mesos.MesosExecutorDriver;
-import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
@@ -23,7 +22,6 @@ public class TachyonMasterExecutor extends AbstractNodeExecutor {
   public static SchedulerConf conf = SchedulerConf.getInstance();
   public static final Log log = LogFactory.getLog(TachyonMasterExecutor.class);
   private Task masterNodeTask;
-  private ExecutorInfo executorInfo;
 
   TachyonMasterExecutor(SchedulerConf schedulerConf) {
     super(schedulerConf);
@@ -47,25 +45,25 @@ public class TachyonMasterExecutor extends AbstractNodeExecutor {
 
     log.info("launching master task");
     String data = new String(taskInfo.getData().toByteArray());
-    String hostAddress="";
+    String hostAddress = "";
     log.info("Getting hostname of master machine");
 
     try {
-    	hostAddress = InetAddress.getLocalHost().getHostName();
-    	log.info("Tachyon Master hostname is " + hostAddress);
+      hostAddress = InetAddress.getLocalHost().getHostName();
+      log.info("Tachyon Master hostname is " + hostAddress);
     } catch (UnknownHostException e) {
       log.error("Error in getting local host address : " + e);
     }
 
     TaskInfo taskInfo2 = TaskInfo
-            .newBuilder()
-            .setName(TachyonConstants.MASTER_NODE_ID)
-            .setTaskId(taskInfo.getTaskId())
-            .setSlaveId(taskInfo.getSlaveId())
-            .addAllResources(taskInfo.getResourcesList())
-            .setExecutor(taskInfo.getExecutor())
-            .setData(ByteString.copyFromUtf8(data + " " + hostAddress))
-            .build();
+        .newBuilder()
+        .setName(TachyonConstants.MASTER_NODE_ID)
+        .setTaskId(taskInfo.getTaskId())
+        .setSlaveId(taskInfo.getSlaveId())
+        .addAllResources(taskInfo.getResourcesList())
+        .setExecutor(taskInfo.getExecutor())
+        .setData(ByteString.copyFromUtf8(data + " " + hostAddress))
+        .build();
 
     Task task = new Task(taskInfo2);
     masterNodeTask = task;

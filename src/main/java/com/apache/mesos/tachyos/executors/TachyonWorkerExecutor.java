@@ -4,7 +4,6 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.apache.mesos.ExecutorDriver;
 import org.apache.mesos.MesosExecutorDriver;
-import org.apache.mesos.Protos.ExecutorInfo;
 import org.apache.mesos.Protos.Status;
 import org.apache.mesos.Protos.TaskID;
 import org.apache.mesos.Protos.TaskInfo;
@@ -17,7 +16,6 @@ public class TachyonWorkerExecutor extends AbstractNodeExecutor {
 
   public static final Log log = LogFactory.getLog(TachyonWorkerExecutor.class);
   private Task workerNodeTask;
-  private ExecutorInfo executorInfo;
 
   TachyonWorkerExecutor(SchedulerConf schedulerConf) {
     super(schedulerConf);

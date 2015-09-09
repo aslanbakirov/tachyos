@@ -23,7 +23,6 @@ $ java -cp tachyos-0.1.0-uber.jar com.apache.mesos.tachyos.Main
 The scheduler:
 
 - registers as a framework with a Mesos master, naturally
-- links against the tachyon library and starts a Tachyon Master
-  in the same process.
+- links against the tachyon library and starts 3 Tachyon Masters, registers with Zookeeper for master failover.
 - launches Tachyon worker processes on Mesos slaves
 
