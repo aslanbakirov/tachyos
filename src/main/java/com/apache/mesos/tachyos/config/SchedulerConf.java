@@ -36,8 +36,20 @@ public class SchedulerConf {
     return getConf().getProperty("mesos.tachyon.executor.path", "..");
   }
 
-  public String getExecutorHeap() {
-    return getConf().getProperty("mesos.tachyon.executor.heap.size", "256");
+  public String getTachyonMasterCpu() {
+    return getConf().getProperty("mesos.tachyon.master.cpu", "0.5");
+  }
+
+  public String getTachyonWorkerCpu() {
+    return getConf().getProperty("mesos.tachyon.worker.cpu", "0.5");
+  }
+
+  public String getTachyonMasterMem() {
+    return getConf().getProperty("mesos.tachyon.master.mem", "1024");
+  }
+
+  public String getTachyonWorkerMem() {
+    return getConf().getProperty("mesos.tachyon.worker.mem", "1024");
   }
 
   public String getJvmOverhead() {

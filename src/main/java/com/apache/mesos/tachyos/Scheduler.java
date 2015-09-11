@@ -28,6 +28,7 @@ import org.apache.mesos.Protos.Value;
 import org.apache.mesos.Protos.Value.Range;
 import org.apache.mesos.SchedulerDriver;
 
+import com.apache.mesos.tachyos.config.NodeType;
 import com.apache.mesos.tachyos.config.SchedulerConf;
 import com.apache.mesos.tachyos.config.TachyonConstants;
 import com.google.protobuf.ByteString;
@@ -154,12 +155,18 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 	     //TODO (aslan) Check locality of tachyon master and scheduler on the same machine because of NGINX routing.
 	     if(!masterStarted && !masters.contains(offer.getHostname()) && masters.size() < TachyonConstants.TOTAL_MASTER_NODES){
 	    	 
-	    	 log.info("Starting Tachyon master on "+offer.getHostname());
+	    	 if (offerNotEnoughResources(offer,
+	    		      Double.parseDouble(conf.getTachyonMasterCpu()),
+	    		      Integer.parseInt(conf.getTachyonMasterMem()), NodeType.MASTER.getValue())){
+	    		      log.info("Offer does not have enough resources to start master");
+	    	     driver.declineOffer(offer.getId());
+	    	     continue;
+	    	 }
 	    	 
-		        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.MASTER_NODE_ID + "." + System.currentTimeMillis()).build();
-		        
-		        masterTaskId = taskId;
-		        
+	    	 
+	    	 log.info("Starting Tachyon master on "+offer.getHostname());
+	    	 TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.MASTER_NODE_ID + "." + System.currentTimeMillis()).build();
+		     masterTaskId = taskId;
 		        TaskInfo task = TaskInfo
 		                .newBuilder()
 		                .setName(TachyonConstants.MASTER_NODE_ID)
@@ -185,7 +192,16 @@ public void resourceOffers(SchedulerDriver driver, List<Offer> offers) {
 	     }
 	     
 	     else if(!workers.contains(offer.getHostname()) && masterStarted){  
-	        log.info("Starting Tachyon worker on "+offer.getHostname());
+	        
+	    	 if (offerNotEnoughResources(offer,
+	    		      Double.parseDouble(conf.getTachyonWorkerCpu()),
+	    		      Integer.parseInt(conf.getTachyonWorkerMem()), NodeType.WORKER.getValue())){
+	    		      log.info("Offer does not have enough resources to start worker");
+	    	     driver.declineOffer(offer.getId());
+	    	     continue;
+	    	 }
+	    	 
+	    	 log.info("Starting Tachyon worker on "+offer.getHostname());
 	        
 	        TaskID taskId = TaskID.newBuilder().setValue(TachyonConstants.WORKER_NODE_ID + System.currentTimeMillis()).build();
 	        TaskInfo task = TaskInfo
@@ -353,7 +369,7 @@ private static List<Resource> getWorkerExecutorResources() {
 /**
  * Port range for tachyon web server and tachyon master and workers.
  */
-private static List<Range> getMasterPortRange(){
+private  List<Range> getMasterPortRange(){
 
 	List<Range> result = new ArrayList<Range>();
 	result.add(Value.Range.newBuilder().setBegin(19990).setEnd(20000).build());
@@ -366,7 +382,7 @@ private static List<Range> getMasterPortRange(){
  * @param hostname
  * @return true if hostname of resource offer and scheduler are on the same machine
  */
-private static boolean checkLocality(String hostname){
+private  boolean checkLocality(String hostname){
 	try {
 		return java.net.InetAddress.getLocalHost().getHostName().equals(hostname);
 	} catch (UnknownHostException e) {
@@ -374,5 +390,21 @@ private static boolean checkLocality(String hostname){
 	}
 	return false;
 }
+private boolean offerNotEnoughResources(Offer offer, double cpus, int mem, String nodeType) {
+	String nodeCpu = nodeType.equals(NodeType.MASTER) ? conf.getMasterExecutorCpus() : conf.getWorkerExecutorCpus();
+	String nodeMem = nodeType.equals(NodeType.MASTER) ? conf.getMasterExecutorMem() : conf.getWorkerExecutorMem();
+	
+	for (Resource offerResource : offer.getResourcesList()) {
+      if (offerResource.getName().equals("cpus") &&
+        cpus + Double.parseDouble(nodeCpu) > offerResource.getScalar().getValue()) {
+        return true;
+      }
+      if (offerResource.getName().equals("mem") && 
+        (mem + Double.parseDouble(nodeMem) * Double.parseDouble(conf.getJvmOverhead())) > offerResource.getScalar().getValue()) {
+        return true;
+      }
+    }
+    return false;
+  }
 
 }

@@ -78,7 +78,6 @@ public class TachyonMasterExecutor extends AbstractNodeExecutor {
   }
 
   public void shutdown(ExecutorDriver driver) {
-
     log.info("Executor asked to shutdown");
     killTask(driver, masterNodeTask.taskInfo.getTaskId());
   }
