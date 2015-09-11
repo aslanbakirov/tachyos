@@ -92,12 +92,12 @@ public class SchedulerConf {
     return getConf().getProperty("mesos.master.port", "5050");
   }
 
-  public String getStateZkServers() {
-    return getConf().getProperty("mesos.hdfs.state.zk", "localhost:2181");
+  public String getZkAddress() {
+    return getConf().getProperty("mesos.zk.uri", "master.mesos:2181");
   }
 
-  public String getStateZkTimeout() {
-    return getConf().getProperty("mesos.hdfs.state.zk.timeout.ms", "20000");
+  public String getTachyonZkLeaderPath() {
+    return getConf().getProperty("mesos.tachyon.zk.leader.path", "/leader");
   }
 
   public String getJvmOpts() {

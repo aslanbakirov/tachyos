@@ -1,5 +1,7 @@
 package com.apache.mesos.tachyos;
 
+import java.io.IOException;
+import java.net.InetSocketAddress;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -33,6 +35,8 @@ import com.apache.mesos.tachyos.config.SchedulerConf;
 import com.apache.mesos.tachyos.config.TachyonConstants;
 import com.google.protobuf.ByteString;
 
+import tachyon.LeaderInquireClient;
+
 /**
  * This is the scheduler class of Tachyos Framework
  * @author Aslan Bakirov
@@ -60,14 +64,17 @@ public void run() {
 		        .setName(conf.getFrameworkName())
 		        .setFailoverTimeout(new Double(conf.getFailoverTimeout()))
 		        .setUser(conf.getTachyonUser())
-		        .setWebuiUrl(conf.getTachyonWebUri())
+		        .setWebuiUrl(getTachyonLeaderMasterAddress() + ":" + conf.getTachyonWebPort())
 		        .setRole(conf.getTachyonRole())
 		        .setCheckpoint(true);
 
 		    MesosSchedulerDriver driver = new MesosSchedulerDriver(this, frameworkInfo.build(),
 		        conf.getMesosMasterUri());
 		    driver.run();
+		    
 		  }
+
+
 
 /**
  * This method logs message when scheduler driver is disconnected
@@ -283,7 +290,7 @@ private static ExecutorInfo getTachyonWorkerExecutor(){
 return executor;
 }
 
-private static ExecutorInfo getTachyonMasterExecutor(){
+public static ExecutorInfo getTachyonMasterExecutor(){
 
 	String path=dependencyURL + "tachyos-0.0.1-uber.jar";	
 	String tachyonPath =dependencyURL + "tachyon-0.7.0-bin.tgz";
@@ -406,5 +413,23 @@ private boolean offerNotEnoughResources(Offer offer, double cpus, int mem, Strin
     }
     return false;
   }
+
+ public String getTachyonLeaderMasterAddress(){
+	 
+	 String temp = null;
+	 String[] strArr=null;
+	 LeaderInquireClient leaderInquireClient =
+		        LeaderInquireClient.getClient(conf.getZkAddress(), conf.getTachyonZkLeaderPath());
+		    try {
+		      temp = leaderInquireClient.getMasterAddress();
+		      strArr = temp.split(":");
+		      if (strArr.length != 2) {
+		        log.error("Invalid InetSocketAddress " + temp);
+		      }
+		    } catch (Exception e) {
+		      log.error(e.getMessage(), e);
+		    }
+		    return strArr[0];
+ }
 
 }
