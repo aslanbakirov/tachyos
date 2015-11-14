@@ -2,7 +2,7 @@
 A Mesos Framework for Tachyon, a memory-centric distributed file system.
 ## Word of Warning
 
-_This is not production-ready version. Still Under development._
+_This is not production-ready version. Still Under development. Merged to amplab tachyon project
 
 ## Prerequisites
 
